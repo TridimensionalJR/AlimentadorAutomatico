@@ -1,0 +1,142 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### --------------------------X---------------------------------- ###
+
+# ==========================================
+# Java / Maven
+# ==========================================
+
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven
+.mvn/timing.properties
+
+# Não ignorar o Maven Wrapper
+!.mvn/wrapper/maven-wrapper.properties
+!.mvn/wrapper/maven-wrapper.jar
+
+
+# ==========================================
+# IntelliJ IDEA
+# ==========================================
+
+.idea/
+*.iml
+*.iws
+*.ipr
+
+
+# ==========================================
+# Eclipse
+# ==========================================
+
+.classpath
+.project
+.settings/
+.factorypath
+
+
+# ==========================================
+# Visual Studio Code
+# ==========================================
+
+.vscode/
+
+
+# ==========================================
+# Spring Boot / Logs
+# ==========================================
+
+*.log
+logs/
+
+
+# ==========================================
+# Variáveis de ambiente / Secrets
+# ==========================================
+
+.env
+.env.*
+!.env.example
+
+
+# ==========================================
+# PostgreSQL
+# ==========================================
+
+# Dados locais do PostgreSQL
+postgres-data/
+pgdata/
+
+# Dumps locais
+*.sql
+*.dump
+*.backup
+
+
+# ==========================================
+# Docker
+# ==========================================
+
+# Arquivos locais de configuração
+docker-compose.override.yml
+
+# Volumes locais
+volumes/
+docker-data/
+
+
+# ==========================================
+# Sistema operacional
+# ==========================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# ==========================================
+# Arquivos temporários
+# ==========================================
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
