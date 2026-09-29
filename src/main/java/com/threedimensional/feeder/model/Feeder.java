@@ -52,6 +52,11 @@ public class Feeder {
     /** Switches the whole feeder on or off, independently of its individual rules. */
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
+    /**
+     * The owning account. Lazy because the owner is almost never needed when scheduling, and
+     * {@code spring.jpa.open-in-view=false} means an unloaded association here raises
+     * LazyInitializationException rather than silently querying outside the transaction.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -79,6 +84,11 @@ public class Feeder {
         return new Feeder(deviceId, name, description, user);
     }
 
+    /**
+     * Applies a rename. The relation to {@link User} and {@link #deviceId} have no update method
+     * on purpose: an owner and a hardware pairing are reassigned only by creating a new feeder,
+     * never by mutating an existing one.
+     */
     public void update(String name, String description) {
         this.name = validateName(name);
         this.description = description;
