@@ -1,0 +1,40 @@
+name: CI
+
+# Runs on every push to master and on every pull request. The pull_request trigger also covers
+# branches that are not master, so a fork or feature branch gets the same guarantees before merge.
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+# Rapid successive pushes to the same branch cancel the older run instead of queueing three
+# builds that test the same commit twice. New pushes always win.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # pom.xml targets Java 25, the same version used for local development. Temurin is the
+      # standard CI distribution; Maven itself is not installed here because the committed
+      # mvnw wrapper downloads Maven 3.9.16 from the pinned distributionUrl on demand.
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Script-only wrapper 3.3.4: it reads the pinned distributionUrl and downloads Maven itself
+      # (via curl) on first run, so no wrapper jar needs to be committed. --batch-mode keeps the
+      # log readable by suppressing progress bars and interactive prompts.
+      - name: Run tests
+        run: ./mvnw --batch-mode test
