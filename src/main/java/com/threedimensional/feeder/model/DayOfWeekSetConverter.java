@@ -23,6 +23,14 @@ import java.util.stream.Collectors;
 public class DayOfWeekSetConverter implements AttributeConverter<Set<DayOfWeek>, String> {
 
     private static final String SEPARATOR = ",";
+    /**
+     * Three-letter codes rather than the full enum names. {@code DayOfWeek.name()} would write
+     * "MONDAY,TUESDAY,...,SUNDAY" - 56 characters, which does not fit the VARCHAR(50) column the
+     * migration declares, and every INTERVAL rule writes all seven days, so every interval rule
+     * would fail to persist. The three letters are unique across the enum, so the short form loses
+     * no information.
+     */
+    private static final int CODE_LENGTH = 3;
 
     /**
      * Writes weekdays sorted Monday to Sunday so the stored value is stable no matter which
@@ -35,10 +43,15 @@ public class DayOfWeekSetConverter implements AttributeConverter<Set<DayOfWeek>,
         }
         return attribute.stream()
                 .sorted(Comparator.comparingInt(DayOfWeek::ordinal))
-                .map(DayOfWeek::name)
+                .map(DayOfWeekSetConverter::toCode)
                 .collect(Collectors.joining(SEPARATOR));
     }
 
+    /**
+     * Throws on an unrecognised code rather than skipping it. A silent drop would turn a corrupted
+     * row into a rule that quietly runs on the wrong days, which is far harder to notice than a
+     * failure at read time.
+     */
     @Override
     public Set<DayOfWeek> convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.isBlank()) {
@@ -47,7 +60,20 @@ public class DayOfWeekSetConverter implements AttributeConverter<Set<DayOfWeek>,
         return Arrays.stream(dbData.split(SEPARATOR))
                 .map(String::trim)
                 .filter(day -> !day.isEmpty())
-                .map(DayOfWeek::valueOf)
+                .map(DayOfWeekSetConverter::toDayOfWeek)
                 .collect(Collectors.toCollection(() -> EnumSet.noneOf(DayOfWeek.class)));
+    }
+
+    private static String toCode(DayOfWeek day) {
+        return day.name().substring(0, CODE_LENGTH);
+    }
+
+    private static DayOfWeek toDayOfWeek(String code) {
+        for (DayOfWeek day : DayOfWeek.values()) {
+            if (toCode(day).equals(code)) {
+                return day;
+            }
+        }
+        throw new IllegalArgumentException("unknown day of week code: " + code);
     }
 }
