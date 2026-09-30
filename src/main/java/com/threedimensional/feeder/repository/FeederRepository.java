@@ -8,8 +8,14 @@ import java.util.UUID;
 
 public interface FeederRepository extends JpaRepository<Feeder, UUID> {
     /**
-     * Every feeder registered to an account. Backed by {@code findByUserId} traversing the
-     * {@code user_id} column of the {@code feeders} table, which is indexed as the foreign key.
+     * Every feeder registered to an account, matching on the {@code user_id} column of the
+     * {@code feeders} table.
      */
     List<Feeder> findByUserId(UUID userId);
+
+    /**
+     * Account deletion's guard: whether any feeder still belongs to the account. Running as an
+     * EXISTS query, it never loads rows just to answer yes or no.
+     */
+    boolean existsByUserId(UUID userId);
 }
