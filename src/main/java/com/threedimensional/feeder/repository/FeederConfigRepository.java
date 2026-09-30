@@ -2,6 +2,8 @@ package com.threedimensional.feeder.repository;
 
 import com.threedimensional.feeder.model.FeederConfig;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -16,10 +18,15 @@ public interface FeederConfigRepository extends JpaRepository<FeederConfig, UUID
     List<FeederConfig> findByFeederIdAndIsActiveTrue(UUID feederId);
 
     /**
-     * Management screens showing a daily schedule in chronological order. Rows of type
-     * INTERVAL have a null {@code timeOfDay} and therefore sort ahead of the timed rules.
+     * Management screens showing a daily schedule in chronological order. Rows of type INTERVAL
+     * have a null {@code timeOfDay} and therefore sort ahead of the timed rules, a promise the
+     * ordering has to spell out: H2 defaults NULLS FIRST for an ascending sort but PostgreSQL
+     * defaults NULLS LAST, so a bare ORDER BY would return the opposite orders on the two
+     * databases. Spring Data has no derived keyword for it, hence the explicit query, whose NULLS
+     * FIRST clause is valid on both.
      */
-    List<FeederConfig> findByFeederIdOrderByTimeOfDayAsc(UUID feederId);
+    @Query("select c from FeederConfig c where c.feeder.id = :feederId order by c.timeOfDay asc nulls first")
+    List<FeederConfig> findByFeederIdOrderByTimeOfDayAscNullsFirst(@Param("feederId") UUID feederId);
 
     /**
      * Duplicate checks before insert, so the caller gets a readable error instead of a raw

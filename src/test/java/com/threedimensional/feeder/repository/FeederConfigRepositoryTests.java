@@ -239,4 +239,22 @@ class FeederConfigRepositoryTests {
 		assertThat(reloaded.getTimezone()).isEqualTo("America/Bahia");
 		assertThat(reloaded.zoneId().getId()).isEqualTo("America/Bahia");
 	}
+
+	/**
+	 * INTERVAL rules carry a null timeOfDay, and "intervals first" has to be earned, not assumed:
+	 * H2 defaults NULLS FIRST for an ascending sort but PostgreSQL defaults NULLS LAST, so without
+	 * the explicit NULLS FIRST clause the two environments would return opposite orders. This pins
+	 * the promise on the very database the suite runs against.
+	 */
+	@Test
+	void findByFeederIdOrderByTimeOfDayAscNullsFirst_shouldSortIntervalsAheadOfTimedRules() {
+		FeederConfig evening = FeederConfig.createDailyTime(feeder, LocalTime.of(18, 30), EnumSet.of(DayOfWeek.MONDAY), 1);
+		FeederConfig morning = FeederConfig.createDailyTime(feeder, LocalTime.of(8, 0), EnumSet.of(DayOfWeek.MONDAY), 1);
+		FeederConfig interval = FeederConfig.createInterval(feeder, 30, 1);
+		configRepository.saveAllAndFlush(java.util.List.of(evening, morning, interval));
+
+		assertThat(configRepository.findByFeederIdOrderByTimeOfDayAscNullsFirst(feeder.getId()))
+				.extracting(FeederConfig::getTimeOfDay)
+				.containsExactly(null, LocalTime.of(8, 0), LocalTime.of(18, 30));
+	}
 }
