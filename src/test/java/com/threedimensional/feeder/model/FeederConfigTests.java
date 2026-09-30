@@ -106,6 +106,19 @@ class FeederConfigTests {
 				.hasMessage("dose must be between 1 and 100");
 	}
 
+	/**
+	 * The dose ceiling is pinned for the interval factory above; this pins it for the daily-time
+	 * factory too. Both run through the same validator, so this is redundancy on purpose: a future
+	 * edit to one factory must not be allowed to slip past just because the other one is tested.
+	 */
+	@Test
+	void createDailyTime_shouldRejectDoseOutsideBounds() {
+		assertThatThrownBy(() -> FeederConfig.createDailyTime(
+				feeder, LocalTime.of(8, 0), EnumSet.of(DayOfWeek.MONDAY), 101))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("dose must be between 1 and 100");
+	}
+
 	@Test
 	void createDailyTime_shouldRejectEmptyWeekdays() {
 		assertThatThrownBy(() -> FeederConfig.createDailyTime(feeder, LocalTime.of(8, 0), EnumSet.noneOf(DayOfWeek.class), 1))
@@ -174,6 +187,38 @@ class FeederConfigTests {
 		weekdays.add(DayOfWeek.SATURDAY);
 
 		assertThat(config.getWeekdays()).containsExactly(DayOfWeek.MONDAY);
+	}
+
+	/**
+	 * update() re-runs the same validators as the constructor, so every rule the factories reject
+	 * has to be rejected when editing an existing rule too. These three mirror the factory-side
+	 * assertions: an edit is just as able to pass a 0, a missing type, or a missing time.
+	 */
+	@Test
+	void update_shouldRejectDoseOutsideBounds() {
+		FeederConfig config = FeederConfig.createInterval(feeder, 30, 1);
+
+		assertThatThrownBy(() -> config.update(ConfigType.INTERVAL, 30, null, null, 0))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("dose must be between 1 and 100");
+	}
+
+	@Test
+	void update_shouldRejectNullType() {
+		FeederConfig config = FeederConfig.createInterval(feeder, 30, 1);
+
+		assertThatThrownBy(() -> config.update(null, 30, null, null, 1))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("type must not be null");
+	}
+
+	@Test
+	void update_shouldRejectNullTimeOfDay_whenTargetTypeIsDaily() {
+		FeederConfig config = FeederConfig.createInterval(feeder, 30, 1);
+
+		assertThatThrownBy(() -> config.update(ConfigType.DAILY_TIME, null, null, EnumSet.of(DayOfWeek.MONDAY), 1))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("time of day must not be null");
 	}
 
 	// --- Runtime state ----------------------------------------------------------------------
