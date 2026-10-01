@@ -17,7 +17,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 @EnableJpaAuditing
 public class FeederApplication {
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         SpringApplication.run(FeederApplication.class, args);
     }
 
