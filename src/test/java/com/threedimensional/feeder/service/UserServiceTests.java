@@ -129,6 +129,28 @@ class UserServiceTests {
 		assertThat(user.getName()).isEqualTo("tiago");
 	}
 
+	// --- Lookup -------------------------------------------------------------------------------
+
+	@Test
+	void getById_shouldReturnTheAccount_whenItExists() {
+		User user = userService.getOrCreateByGoogle(GOOGLE_ID, EMAIL, "Tiago");
+
+		assertThat(userService.getById(user.getId()).getEmail()).isEqualTo(EMAIL);
+	}
+
+	/**
+	 * An authenticated request carries an id that was valid when its token was issued, and the account
+	 * may have been deleted since. Absence has to surface as an exception the controller layer can
+	 * map, never as a null or a half-built user.
+	 */
+	@Test
+	void getById_shouldReject_whenAccountDoesNotExist() {
+		UUID phantom = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+
+		assertThatThrownBy(() -> userService.getById(phantom))
+				.isInstanceOf(UserNotFoundException.class);
+	}
+
 	// --- Deletion -----------------------------------------------------------------------------
 
 	@Test

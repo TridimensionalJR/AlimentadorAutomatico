@@ -61,6 +61,17 @@ public class UserService {
     }
 
     /**
+     * Loads the account behind an authenticated request. The id comes from the token subject, which
+     * only proves the account existed when the token was issued: it can be deleted while the token
+     * is still valid, so absence is a case to report and not one to rule out.
+     */
+    @Transactional(readOnly = true)
+    public User getById(UUID id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+    }
+
+    /**
      * Removes an account. Blocked while the user still owns feeders: the {@code RESTRICT} on
      * feeders - users is the last line of defence, this check answers 409 in the common case.
      * Only the database wins when the two ever disagree.
