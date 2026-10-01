@@ -1,6 +1,7 @@
 package com.threedimensional.feeder.controller;
 
 import com.threedimensional.feeder.exception.InvalidGoogleTokenException;
+import com.threedimensional.feeder.exception.UserHasFeedersException;
 import com.threedimensional.feeder.exception.UserNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -13,8 +14,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * gives the framework's own failures, a body that fails validation or is not valid JSON, the same
  * shape and a 400 for free, so only this application's exceptions are mapped by hand.
  * <p>
- * Only what a controller can raise today is mapped. {@code UserHasFeedersException} waits for the
- * controller that will throw it, as its own javadoc already anticipates.
+ * Only what a controller can raise today is mapped, which is everything this application throws on
+ * purpose so far.
  */
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -36,5 +37,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(UserNotFoundException.class)
     public ProblemDetail handleUserNotFound(UserNotFoundException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "user not found");
+    }
+
+    /**
+     * The 409 its javadoc promised. Unlike the other two, this one is told to the caller on purpose:
+     * it is the only way to learn what to do next, and it reveals nothing the caller does not
+     * already own. The id in the exception message is still left out.
+     */
+    @ExceptionHandler(UserHasFeedersException.class)
+    public ProblemDetail handleUserHasFeeders(UserHasFeedersException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "the account still has feeders: remove them before deleting it");
     }
 }
