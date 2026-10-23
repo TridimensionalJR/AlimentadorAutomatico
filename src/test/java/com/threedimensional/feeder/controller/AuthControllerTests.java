@@ -138,8 +138,9 @@ class AuthControllerTests {
 	// --- Everything else is protected ---------------------------------------------------------
 
 	/**
-	 * No route exists at this path yet, which is the point: protection is the default for whatever
-	 * is added next, so the rejection comes before any routing question is asked.
+	 * The path is a real route in the application, but not in this slice, which maps only
+	 * {@code AuthController}. That is the point: protection is the default, so the rejection comes
+	 * before any routing question is asked.
 	 */
 	@Test
 	void anyOtherRoute_shouldReturn401_whenThereIsNoToken() throws Exception {
@@ -147,7 +148,11 @@ class AuthControllerTests {
 				.andExpect(status().isUnauthorized());
 	}
 
-	/** The 404 proves the request got past security: the token was accepted, the route is simply absent. */
+	/**
+	 * The 404 proves the request got past security: the token was accepted, and this slice simply
+	 * does not map {@code /feeders}. That the route does exist in the running application is
+	 * {@code FeederControllerTests}' business, not this slice's.
+	 */
 	@Test
 	void anyOtherRoute_shouldGetPastSecurity_whenTheTokenIsOneWeIssued() throws Exception {
 		String token = jwtService.issue(user()).value();
