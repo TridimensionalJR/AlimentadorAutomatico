@@ -1,5 +1,7 @@
 package com.threedimensional.feeder.controller;
 
+import com.threedimensional.feeder.exception.DeviceAlreadyRegisteredException;
+import com.threedimensional.feeder.exception.FeederNotFoundException;
 import com.threedimensional.feeder.exception.InvalidGoogleTokenException;
 import com.threedimensional.feeder.exception.UserHasFeedersException;
 import com.threedimensional.feeder.exception.UserNotFoundException;
@@ -48,5 +50,34 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleUserHasFeeders(UserHasFeedersException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
                 "the account still has feeders: remove them before deleting it");
+    }
+
+    /**
+     * A feeder of another account answers exactly like one that never existed: same status, same
+     * fixed detail. The id carried by the exception message is for the log only.
+     */
+    @ExceptionHandler(FeederNotFoundException.class)
+    public ProblemDetail handleFeederNotFound(FeederNotFoundException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "feeder not found");
+    }
+
+    /**
+     * One 409 for both the pre-check and the unique constraint losing the race: the caller's next
+     * step is the same, and the device id it sent is not echoed back.
+     */
+    @ExceptionHandler(DeviceAlreadyRegisteredException.class)
+    public ProblemDetail handleDeviceAlreadyRegistered(DeviceAlreadyRegisteredException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "device already registered");
+    }
+
+    /**
+     * Domain validation rejects bad input by throwing {@link IllegalArgumentException} (an unknown
+     * timezone, for instance), and 400 is the only honest translation. The message names the
+     * rejected value, so it stays out of the response. An IAE that means a programming bug rather
+     * than bad input needs its own exception before this mapping stays safe.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "invalid request content");
     }
 }
