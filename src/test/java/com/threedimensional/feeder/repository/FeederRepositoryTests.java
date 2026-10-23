@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class FeederRepositoryTests {
 
 	private static final UUID DEVICE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+	private static final UUID OTHER_DEVICE_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
 	@Autowired
 	private FeederRepository feederRepository;
@@ -91,5 +92,71 @@ class FeederRepositoryTests {
 				.singleElement()
 				.extracting(Feeder::getTimezone)
 				.isEqualTo("America/Manaus");
+	}
+
+	/**
+	 * The owner filter lives in the query, so a wrong owner is indistinguishable from a missing
+	 * row. Clearing the persistence context first keeps the hit from being the first-level cache.
+	 */
+	@Test
+	void findByIdAndUserId_shouldReturnFeeder_whenOwnerMatches() {
+		Feeder feeder = feederRepository.saveAndFlush(Feeder.create(DEVICE_ID, "Alimentador da sala", null, user));
+		entityManager.clear();
+
+		assertThat(feederRepository.findByIdAndUserId(feeder.getId(), user.getId()))
+				.isPresent()
+				.get()
+				.extracting(Feeder::getName)
+				.isEqualTo("Alimentador da sala");
+	}
+
+	@Test
+	void findByIdAndUserId_shouldReturnEmpty_whenFeederBelongsToAnotherUser() {
+		User other = userRepository.saveAndFlush(User.create("google-xyz", "bruna@example.com", "Bruna"));
+		Feeder feeder = feederRepository.saveAndFlush(
+				Feeder.create(OTHER_DEVICE_ID, "Alimentador do escritorio", null, other));
+		entityManager.clear();
+
+		assertThat(feederRepository.findByIdAndUserId(feeder.getId(), user.getId())).isEmpty();
+	}
+
+	/**
+	 * The owner has a feeder on purpose: with an empty owner, "no row" would also be what a query
+	 * that ignores the id (for example, the owner's first feeder) returns. The random id proves the
+	 * id predicate is applied, not only the owner filter.
+	 */
+	@Test
+	void findByIdAndUserId_shouldReturnEmpty_whenIdDoesNotExist() {
+		feederRepository.saveAndFlush(Feeder.create(DEVICE_ID, "Alimentador da sala", null, user));
+		entityManager.clear();
+
+		assertThat(feederRepository.findByIdAndUserId(UUID.randomUUID(), user.getId())).isEmpty();
+	}
+
+	@Test
+	void existsByDeviceId_shouldReturnTrue_whenDeviceIsPaired() {
+		feederRepository.saveAndFlush(Feeder.create(DEVICE_ID, "Alimentador da sala", null, user));
+
+		assertThat(feederRepository.existsByDeviceId(DEVICE_ID)).isTrue();
+	}
+
+	@Test
+	void existsByDeviceId_shouldReturnFalse_whenDeviceIsFree() {
+		feederRepository.saveAndFlush(Feeder.create(DEVICE_ID, "Alimentador da sala", null, user));
+
+		assertThat(feederRepository.existsByDeviceId(UUID.randomUUID())).isFalse();
+	}
+
+	/**
+	 * Duplicate detection is global because the UNIQUE constraint is per table: another account
+	 * holding the device must still block the pairing.
+	 */
+	@Test
+	void existsByDeviceId_shouldReturnTrue_whenDeviceBelongsToAnotherUser() {
+		User other = userRepository.saveAndFlush(User.create("google-xyz", "bruna@example.com", "Bruna"));
+		feederRepository.saveAndFlush(
+				Feeder.create(OTHER_DEVICE_ID, "Alimentador do escritorio", null, other));
+
+		assertThat(feederRepository.existsByDeviceId(OTHER_DEVICE_ID)).isTrue();
 	}
 }
