@@ -2,14 +2,15 @@ package com.threedimensional.feeder.controller;
 
 import com.threedimensional.feeder.exception.DeviceAlreadyRegisteredException;
 import com.threedimensional.feeder.exception.FeederNotFoundException;
+import com.threedimensional.feeder.exception.InvalidFeederDataException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
 /**
- * Test fixture, not a production endpoint: three routes whose only job is to raise the exceptions
- * the advice maps, so the mapping can be asserted without a real controller and its collaborators.
+ * Test fixture, not a production endpoint: routes whose only job is to raise the exceptions the
+ * advice maps, so the mapping can be asserted without a real controller and its collaborators.
  * <p>
  * Top-level and package-private on purpose. {@code @WebMvcTest(controllers = ...)} only filters
  * component scanning, it does not register anything; a class in the scanned package (test classes
@@ -33,8 +34,16 @@ class ApiExceptionHandlerStubController {
         throw new DeviceAlreadyRegisteredException(DEVICE_ID);
     }
 
+    /** What the service produces: the domain's IAE, labelled as bad input, message and cause intact. */
     @GetMapping("/test/invalid-content")
     void invalidContent() {
-        throw new IllegalArgumentException("Unknown time-zone ID: " + INVALID_TIMEZONE);
+        IllegalArgumentException cause = new IllegalArgumentException("Unknown time-zone ID: " + INVALID_TIMEZONE);
+        throw new InvalidFeederDataException(cause.getMessage(), cause);
+    }
+
+    /** An IAE from outside the translated domain calls: a bug, and no handler may claim it. */
+    @GetMapping("/test/illegal-argument")
+    void unmappedIllegalArgument() {
+        throw new IllegalArgumentException("Id must not be null");
     }
 }

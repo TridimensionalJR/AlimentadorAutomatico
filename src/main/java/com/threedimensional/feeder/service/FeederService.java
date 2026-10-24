@@ -2,6 +2,7 @@ package com.threedimensional.feeder.service;
 
 import com.threedimensional.feeder.exception.DeviceAlreadyRegisteredException;
 import com.threedimensional.feeder.exception.FeederNotFoundException;
+import com.threedimensional.feeder.exception.InvalidFeederDataException;
 import com.threedimensional.feeder.model.Feeder;
 import com.threedimensional.feeder.model.User;
 import com.threedimensional.feeder.repository.FeederRepository;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * The feeder lifecycle. Every method takes the caller's id as its first parameter, and that is the
@@ -49,9 +51,12 @@ public class FeederService {
      * the loser of a race fails at the one place the catch can see, instead of at commit after the
      * method has returned. A plain {@code save} would defer the insert and turn that 409 into a 500.
      * <p>
-     * The catch covers the flush and nothing else. A blank name or an unknown zone is rejected by
-     * {@link Feeder} as {@link IllegalArgumentException}, which the API answers with 400; folding
-     * that into "device already registered" would report the wrong cause.
+     * The two catches answer different questions and stay apart. The flush catch turns the race into
+     * a 409: a duplicated device is a conflict, and the caller's next step is the same whether the
+     * pre-check or the constraint noticed it. The helper around the domain calls turns bad input into
+     * a 400: a blank name or an unknown zone is rejected by {@link Feeder} as
+     * {@link IllegalArgumentException}, and folding that into "device already registered" would
+     * report the wrong cause.
      *
      * @param timezone IANA zone id, or {@code null} to keep the domain default
      */
@@ -61,9 +66,12 @@ public class FeederService {
         if (feederRepository.existsByDeviceId(deviceId)) {
             throw new DeviceAlreadyRegisteredException(deviceId);
         }
-        Feeder feeder = Feeder.create(deviceId, name, description, user);
+        Feeder feeder = translatingInvalidInput(() -> Feeder.create(deviceId, name, description, user));
         if (timezone != null) {
-            feeder.updateTimezone(timezone);
+            translatingInvalidInput(() -> {
+                feeder.updateTimezone(timezone);
+                return feeder;
+            });
         }
         try {
             return feederRepository.saveAndFlush(feeder);
@@ -95,19 +103,24 @@ public class FeederService {
     @Transactional
     public Feeder update(UUID userId, UUID id, String name, String description) {
         Feeder feeder = loadOwned(userId, id);
-        feeder.update(name, description);
-        return feeder;
+        return translatingInvalidInput(() -> {
+            feeder.update(name, description);
+            return feeder;
+        });
     }
 
     /**
      * Moves the device to another IANA zone. Validation stays in the domain, which keeps this method
-     * from repeating the {@code ZoneId} rule; an unknown zone reaches the API as a 400.
+     * from repeating the {@code ZoneId} rule; the helper labels the rejection as bad input, so an
+     * unknown zone reaches the API as a 400.
      */
     @Transactional
     public Feeder updateTimezone(UUID userId, UUID id, String timezone) {
         Feeder feeder = loadOwned(userId, id);
-        feeder.updateTimezone(timezone);
-        return feeder;
+        return translatingInvalidInput(() -> {
+            feeder.updateTimezone(timezone);
+            return feeder;
+        });
     }
 
     /** Switches the feeder on. Idempotent: an active feeder just returns its current state. */
@@ -145,5 +158,18 @@ public class FeederService {
     private Feeder loadOwned(UUID userId, UUID id) {
         return feederRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new FeederNotFoundException(id));
+    }
+
+    /**
+     * Runs a domain call and labels its rejection as bad input. Only the call goes inside the try:
+     * the repository, {@link UserService} and the flush stay outside, so their failures keep their
+     * own type instead of being reported as the caller's mistake.
+     */
+    private static <T> T translatingInvalidInput(Supplier<T> domainCall) {
+        try {
+            return domainCall.get();
+        } catch (IllegalArgumentException e) {
+            throw new InvalidFeederDataException(e.getMessage(), e);
+        }
     }
 }

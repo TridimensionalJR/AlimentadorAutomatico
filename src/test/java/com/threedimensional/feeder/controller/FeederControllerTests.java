@@ -4,6 +4,7 @@ import com.threedimensional.feeder.config.JwtConfig;
 import com.threedimensional.feeder.config.SecurityConfig;
 import com.threedimensional.feeder.exception.DeviceAlreadyRegisteredException;
 import com.threedimensional.feeder.exception.FeederNotFoundException;
+import com.threedimensional.feeder.exception.InvalidFeederDataException;
 import com.threedimensional.feeder.exception.UserNotFoundException;
 import com.threedimensional.feeder.model.Feeder;
 import com.threedimensional.feeder.model.User;
@@ -69,6 +70,7 @@ class FeederControllerTests {
 			"{\"deviceId\":\"" + DEVICE_ID + "\",\"name\":\"Breakfast feeder\",\"description\":\"Kitchen\"}";
 	private static final String UPDATE_BODY = "{\"name\":\"Evening feeder\",\"description\":\"Porch\"}";
 	private static final String TIMEZONE_BODY = "{\"timezone\":\"America/Manaus\"}";
+	private static final String INVALID_TIMEZONE = "Mars/Olympus";
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -186,6 +188,26 @@ class FeederControllerTests {
 				.andExpect(jsonPath("$.detail").value("user not found"));
 
 		verify(feederService).create(USER_ID, DEVICE_ID, "Breakfast feeder", "Kitchen", null);
+	}
+
+	/**
+	 * A zone the domain rejects is a client error, answered with the fixed detail: the message
+	 * naming the rejected value stays out of the body, since it would help map what is accepted.
+	 */
+	@Test
+	void create_shouldReturn400_whenTheDomainRejectsTheTimezone() throws Exception {
+		when(feederService.create(USER_ID, DEVICE_ID, "Breakfast feeder", null, INVALID_TIMEZONE))
+				.thenThrow(invalidTimezone());
+
+		mockMvc.perform(post("/feeders").header("Authorization", bearer())
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"deviceId\":\"" + DEVICE_ID
+								+ "\",\"name\":\"Breakfast feeder\",\"timezone\":\"" + INVALID_TIMEZONE + "\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("invalid request content"))
+				.andExpect(content().string(not(containsString(INVALID_TIMEZONE))));
+
+		verify(feederService).create(USER_ID, DEVICE_ID, "Breakfast feeder", null, INVALID_TIMEZONE);
 	}
 
 	/**
@@ -348,8 +370,8 @@ class FeederControllerTests {
 
 	/**
 	 * Blank and oversized zones are rejected before the service. An unknown but well-formed zone is
-	 * not this test's business: it passes the DTO and is rejected by the domain, answered by the
-	 * advice.
+	 * a separate case: it passes the DTO and is rejected by the domain, covered by
+	 * {@code updateTimezone_shouldReturn400_whenTheDomainRejectsTheZone}.
 	 */
 	@ParameterizedTest(name = "body={0}")
 	@MethodSource("invalidTimezoneBodies")
@@ -359,6 +381,20 @@ class FeederControllerTests {
 				.andExpect(status().isBadRequest());
 
 		verifyNoInteractions(feederService);
+	}
+
+	/** The zone that got past the DTO and was rejected by the domain answers the same fixed 400. */
+	@Test
+	void updateTimezone_shouldReturn400_whenTheDomainRejectsTheZone() throws Exception {
+		when(feederService.updateTimezone(USER_ID, FEEDER_ID, INVALID_TIMEZONE)).thenThrow(invalidTimezone());
+
+		mockMvc.perform(put("/feeders/{id}/timezone", FEEDER_ID).header("Authorization", bearer())
+						.contentType(MediaType.APPLICATION_JSON).content(timezoneBody(INVALID_TIMEZONE)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("invalid request content"))
+				.andExpect(content().string(not(containsString(INVALID_TIMEZONE))));
+
+		verify(feederService).updateTimezone(USER_ID, FEEDER_ID, INVALID_TIMEZONE);
 	}
 
 	// --- Switching on and off -----------------------------------------------------------------
@@ -563,5 +599,16 @@ class FeederControllerTests {
 		Feeder feeder = feeder();
 		feeder.updateTimezone("America/Manaus");
 		return feeder;
+	}
+
+	/** What the service throws when the domain rejects a zone: the value survives only in the cause. */
+	private static InvalidFeederDataException invalidTimezone() {
+		IllegalArgumentException cause =
+				new IllegalArgumentException("timezone must be a valid zone id: " + INVALID_TIMEZONE);
+		return new InvalidFeederDataException(cause.getMessage(), cause);
+	}
+
+	private static String timezoneBody(String timezone) {
+		return "{\"timezone\":\"" + timezone + "\"}";
 	}
 }

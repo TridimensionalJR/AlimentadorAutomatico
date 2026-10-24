@@ -2,6 +2,7 @@ package com.threedimensional.feeder.controller;
 
 import com.threedimensional.feeder.exception.DeviceAlreadyRegisteredException;
 import com.threedimensional.feeder.exception.FeederNotFoundException;
+import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -11,6 +12,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -70,11 +72,24 @@ class ApiExceptionHandlerTests {
 	 * echoing it would help an attacker map what the validator accepts.
 	 */
 	@Test
-	void illegalArgument_shouldReturn400_andNotEchoTheRejectedValue() throws Exception {
+	void invalidFeederData_shouldReturn400_andNotEchoTheRejectedValue() throws Exception {
 		mockMvc.perform(get("/test/invalid-content"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.detail").value("invalid request content"))
 				.andExpect(content().string(not(containsString(ApiExceptionHandlerStubController.INVALID_TIMEZONE))));
+	}
+
+	/**
+	 * The other side of that decision: an IAE that no domain call labelled is a bug, so it must not
+	 * be answered as a client error. MockMvc does not run the ERROR dispatch, so the unresolved
+	 * exception reaches the test wrapped by {@code FrameworkServlet} in a {@code ServletException};
+	 * on a real container the same path answers 500. What this proves is that it is no longer a 400.
+	 */
+	@Test
+	void illegalArgument_shouldPropagate_whenNoDomainExceptionWrapsIt() {
+		assertThatThrownBy(() -> mockMvc.perform(get("/test/illegal-argument")))
+				.isInstanceOf(ServletException.class)
+				.hasCauseInstanceOf(IllegalArgumentException.class);
 	}
 
 	/**

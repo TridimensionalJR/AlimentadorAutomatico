@@ -2,6 +2,7 @@ package com.threedimensional.feeder.service;
 
 import com.threedimensional.feeder.exception.DeviceAlreadyRegisteredException;
 import com.threedimensional.feeder.exception.FeederNotFoundException;
+import com.threedimensional.feeder.exception.InvalidFeederDataException;
 import com.threedimensional.feeder.exception.UserNotFoundException;
 import com.threedimensional.feeder.model.Feeder;
 import com.threedimensional.feeder.model.User;
@@ -149,15 +150,41 @@ class FeederServiceTests {
 		verifyNoMoreInteractions(feederRepository);
 	}
 
-	/** An empty but non-null timezone passes the DTO and must remain a domain 400, never a 409. */
+	/**
+	 * An empty but non-null timezone passes the DTO and is rejected by the domain. The helper labels
+	 * that rejection as bad input, and the domain message (which names the value) is preserved for
+	 * the log, never for the response.
+	 */
 	@Test
-	void create_shouldLetDomainValidationEscape_whenTheTimezoneIsEmpty() {
+	void create_shouldTranslateDomainValidation_whenTheTimezoneIsEmpty() {
 		when(userService.getById(USER_ID)).thenReturn(user);
 
 		assertThatThrownBy(() -> feederService.create(USER_ID, DEVICE_ID, "Alimentador da sala", null, ""))
-				.isInstanceOf(IllegalArgumentException.class);
+				.isInstanceOf(InvalidFeederDataException.class)
+				.hasMessage("timezone must not be blank")
+				.hasCauseInstanceOf(IllegalArgumentException.class);
 
 		verify(feederRepository).existsByDeviceId(DEVICE_ID);
+		verifyNoMoreInteractions(feederRepository);
+	}
+
+	/**
+	 * The helper wraps the domain calls only. A repository failing with an IAE is a bug, not bad
+	 * input: translating it would report a server defect as the caller's fault, so its type must
+	 * survive and the flush is never reached.
+	 */
+	@Test
+	void create_shouldNotTranslate_whenTheRepositoryThrowsIllegalArgument() {
+		when(userService.getById(USER_ID)).thenReturn(user);
+		when(feederRepository.existsByDeviceId(DEVICE_ID))
+				.thenThrow(new IllegalArgumentException("Id must not be null"));
+
+		assertThatThrownBy(() -> feederService.create(USER_ID, DEVICE_ID, "Alimentador da sala", null, null))
+				.isInstanceOf(IllegalArgumentException.class)
+				.isNotInstanceOf(InvalidFeederDataException.class);
+
+		verify(feederRepository).existsByDeviceId(DEVICE_ID);
+		verify(feederRepository, never()).saveAndFlush(any(Feeder.class));
 		verifyNoMoreInteractions(feederRepository);
 	}
 
@@ -238,6 +265,20 @@ class FeederServiceTests {
 		verifyNoMoreInteractions(feederRepository);
 	}
 
+	/** A blank name that got past the DTO is the domain's rejection, labelled as bad input. */
+	@Test
+	void update_shouldTranslateDomainValidation_whenTheNameIsBlank() {
+		when(feederRepository.findByIdAndUserId(FEEDER_ID, USER_ID)).thenReturn(Optional.of(feeder));
+
+		assertThatThrownBy(() -> feederService.update(USER_ID, FEEDER_ID, "   ", null))
+				.isInstanceOf(InvalidFeederDataException.class)
+				.hasMessage("name must not be blank")
+				.hasCauseInstanceOf(IllegalArgumentException.class);
+
+		verify(feederRepository).findByIdAndUserId(FEEDER_ID, USER_ID);
+		verifyNoMoreInteractions(feederRepository);
+	}
+
 	// --- updateTimezone -----------------------------------------------------------------------
 
 	@Test
@@ -257,6 +298,20 @@ class FeederServiceTests {
 
 		assertThatThrownBy(() -> feederService.updateTimezone(USER_ID, FEEDER_ID, "America/Manaus"))
 				.isInstanceOf(FeederNotFoundException.class);
+
+		verify(feederRepository).findByIdAndUserId(FEEDER_ID, USER_ID);
+		verifyNoMoreInteractions(feederRepository);
+	}
+
+	/** A well-formed but unknown zone passes the DTO and is rejected by the domain, not by the DB. */
+	@Test
+	void updateTimezone_shouldTranslateDomainValidation_whenTheZoneIsUnknown() {
+		when(feederRepository.findByIdAndUserId(FEEDER_ID, USER_ID)).thenReturn(Optional.of(feeder));
+
+		assertThatThrownBy(() -> feederService.updateTimezone(USER_ID, FEEDER_ID, "Mars/Olympus"))
+				.isInstanceOf(InvalidFeederDataException.class)
+				.hasMessageContaining("timezone must be a valid zone id")
+				.hasCauseInstanceOf(IllegalArgumentException.class);
 
 		verify(feederRepository).findByIdAndUserId(FEEDER_ID, USER_ID);
 		verifyNoMoreInteractions(feederRepository);

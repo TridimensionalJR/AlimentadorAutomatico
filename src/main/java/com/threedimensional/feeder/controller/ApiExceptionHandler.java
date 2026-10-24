@@ -2,6 +2,7 @@ package com.threedimensional.feeder.controller;
 
 import com.threedimensional.feeder.exception.DeviceAlreadyRegisteredException;
 import com.threedimensional.feeder.exception.FeederNotFoundException;
+import com.threedimensional.feeder.exception.InvalidFeederDataException;
 import com.threedimensional.feeder.exception.InvalidGoogleTokenException;
 import com.threedimensional.feeder.exception.UserHasFeedersException;
 import com.threedimensional.feeder.exception.UserNotFoundException;
@@ -71,13 +72,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * Domain validation rejects bad input by throwing {@link IllegalArgumentException} (an unknown
-     * timezone, for instance), and 400 is the only honest translation. The message names the
-     * rejected value, so it stays out of the response. An IAE that means a programming bug rather
-     * than bad input needs its own exception before this mapping stays safe.
+     * Bad input the domain rejected: an unknown zone, or a blank name that got past the DTO. 400 is
+     * the honest translation, and the message naming the rejected value stays in the exception (and
+     * in its cause) instead of the response. Every other {@link IllegalArgumentException} is a bug
+     * and is deliberately left unmapped, so it surfaces as a 500 rather than being blamed on the
+     * caller.
      */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ProblemDetail handleIllegalArgument(IllegalArgumentException e) {
+    @ExceptionHandler(InvalidFeederDataException.class)
+    public ProblemDetail handleInvalidFeederData(InvalidFeederDataException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "invalid request content");
     }
 }

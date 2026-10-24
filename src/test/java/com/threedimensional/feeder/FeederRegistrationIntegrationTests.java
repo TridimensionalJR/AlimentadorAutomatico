@@ -66,6 +66,8 @@ class FeederRegistrationIntegrationTests {
 	private static final String AUTHORIZATION = "Authorization";
 	private static final String FEEDER_NAME = "Alimentador da sala";
 	private static final String DEFAULT_TIMEZONE = "America/Bahia";
+	/** Well-formed but unknown to the JVM's zone database, so the domain rejects it. */
+	private static final String INVALID_TIMEZONE = "Mars/Olympus";
 	private static final UUID DEVICE_ID = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
 	private static final UUID OTHER_DEVICE_ID = UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
 	private static final UUID THIRD_DEVICE_ID = UUID.fromString("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
@@ -390,6 +392,61 @@ class FeederRegistrationIntegrationTests {
 				.andExpect(jsonPath("$.detail").value("device already registered"));
 
 		assertThat(feederRepository.findAll()).hasSize(1);
+		assertFeederState(anaToken, feederId, FEEDER_NAME, DEFAULT_TIMEZONE, true);
+	}
+
+	// --- Bad input rejected by the domain -----------------------------------------------------
+
+	/**
+	 * An empty zone is not "absent": only null means the domain default, so the POST reaches the
+	 * domain, is labelled by the service and answered with the fixed 400. The domain message stays in
+	 * the log, and the transaction never commits, which is why no feeder exists afterwards.
+	 */
+	@Test
+	void create_shouldReturn400_whenTheTimezoneIsBlank() throws Exception {
+		mockMvc.perform(post("/feeders")
+						.header(AUTHORIZATION, anaToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(createBody(DEVICE_ID, FEEDER_NAME, null, "")))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.detail").value("invalid request content"))
+				.andExpect(content().string(not(containsString("timezone must not be blank"))));
+
+		assertThat(feederRepository.findAll()).isEmpty();
+	}
+
+	/** Same path for a zone that is well-formed but unknown, and the rejected value is not echoed. */
+	@Test
+	void create_shouldReturn400_whenTheTimezoneIsUnknown() throws Exception {
+		mockMvc.perform(post("/feeders")
+						.header(AUTHORIZATION, anaToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(createBody(DEVICE_ID, FEEDER_NAME, null, INVALID_TIMEZONE)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("invalid request content"))
+				.andExpect(content().string(not(containsString(INVALID_TIMEZONE))));
+
+		assertThat(feederRepository.findAll()).isEmpty();
+	}
+
+	/**
+	 * The zone change fails before the commit, so the old zone survives: the 400 is not just a status,
+	 * the rollback is what keeps a rejected value out of the row.
+	 */
+	@Test
+	void updateTimezone_shouldReturn400_whenTheZoneIsUnknown() throws Exception {
+		UUID feederId = createFeederForAna();
+
+		mockMvc.perform(put("/feeders/{id}/timezone", feederId)
+						.header(AUTHORIZATION, anaToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(timezoneBody(INVALID_TIMEZONE)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("invalid request content"))
+				.andExpect(content().string(not(containsString(INVALID_TIMEZONE))));
+
 		assertFeederState(anaToken, feederId, FEEDER_NAME, DEFAULT_TIMEZONE, true);
 	}
 
