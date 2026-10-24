@@ -5,8 +5,9 @@ package com.threedimensional.feeder.exception;
  * expired, issued for another client, or carrying an email Google has not verified. The
  * controller advice maps it to 401.
  * <p>
- * The message is for the log and is never shown to the caller. Telling an attacker which check
- * failed would only help them probe, so every cause answers with the same generic response.
+ * The message is logged once by {@code GoogleTokenVerifier} and never shown to the caller; the
+ * advice does not log it again. Telling an attacker which check failed would only help them probe,
+ * so every cause answers with the same generic response.
  */
 public class InvalidGoogleTokenException extends RuntimeException {
 

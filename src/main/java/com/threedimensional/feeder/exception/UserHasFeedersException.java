@@ -7,6 +7,8 @@ import java.util.UUID;
  * why the schema restricts feeders - users instead of cascading; this exception turns that
  * database rule into a clear, 409-mappable signal so the controller never surfaces a raw
  * constraint violation.
+ * <p>
+ * The id in the message is logged by the advice and never returned.
  */
 public class UserHasFeedersException extends RuntimeException {
 

@@ -10,9 +10,10 @@ package com.threedimensional.feeder.exception;
  * request path, and an infrastructure bug ({@code Id must not be null}) would be reported as the
  * caller's fault instead of a 500.
  * <p>
- * The message is the domain's own and names the rejected value, so it exists for the log only; the
- * advice never returns it. The cause is typed {@code IllegalArgumentException} on purpose: there is
- * no translation for any other failure, such as a {@code DataIntegrityViolationException}.
+ * The message is the domain's own and names the rejected value, so the advice logs it sanitized
+ * (client input can carry line breaks) and never returns it. The cause is typed
+ * {@code IllegalArgumentException} on purpose: there is no translation for any other failure,
+ * such as a {@code DataIntegrityViolationException}.
  */
 public class InvalidFeederDataException extends RuntimeException {
 

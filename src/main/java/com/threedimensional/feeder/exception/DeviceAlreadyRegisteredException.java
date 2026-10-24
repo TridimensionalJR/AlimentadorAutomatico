@@ -7,7 +7,8 @@ import java.util.UUID;
  * by the service pre-check and, when two requests race past it, again when the unique constraint
  * rejects the flush, so both paths end in the same 409 instead of a 500.
  * <p>
- * The device id stays in the message for the log; the response only says what happened.
+ * The device id stays in the message, which the controller advice logs; the response only says
+ * what happened.
  */
 public class DeviceAlreadyRegisteredException extends RuntimeException {
 

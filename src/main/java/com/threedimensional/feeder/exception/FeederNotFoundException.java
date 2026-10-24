@@ -8,7 +8,7 @@ import java.util.UUID;
  * API answers one identical 404, so the response cannot be used to learn that somebody else's
  * feeder exists.
  * <p>
- * The id travels in the message for the log only; the controller advice never returns it.
+ * The id travels in the message, which the controller advice logs; the response never carries it.
  */
 public class FeederNotFoundException extends RuntimeException {
 
