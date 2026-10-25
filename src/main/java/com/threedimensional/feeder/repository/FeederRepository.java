@@ -6,6 +6,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.util.Optional;
+
+
+
+
 public interface FeederRepository extends JpaRepository<Feeder, UUID> {
     /**
      * Every feeder registered to an account, matching on the {@code user_id} column of the
@@ -18,4 +26,12 @@ public interface FeederRepository extends JpaRepository<Feeder, UUID> {
      * EXISTS query, it never loads rows just to answer yes or no.
      */
     boolean existsByUserId(UUID userId);
+
+
+    // Busca um alimentador pelo ID e pelo ID do proprietário.
+    Optional<Feeder> findByIdAndUserId(UUID feederId, UUID userId);
+
+    // Lista os alimentadores com paginação.
+    Page<Feeder> findByUserId(UUID userId, Pageable pageable);
+
 }
